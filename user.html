@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>スタッフ呼び出し</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;600;700&family=Noto+Sans+JP:wght@300;400;500&display=swap" rel="stylesheet">
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+  <style>
+    :root {
+      --cream: #f5f0e8;
+      --navy: #1a2744;
+      --navy-light: #2a3a60;
+      --gold: #c9a84c;
+      --gold-light: #e8c96a;
+      --text: #2c2c2c;
+      --text-muted: #7a7a7a;
+      --green: #2d7a4f;
+      --green-light: #e8f5ee;
+      --red: #c0392b;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      background-color: var(--cream);
+      font-family: 'Noto Sans JP', sans-serif;
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      overflow-x: hidden;
+    }
+
+    /* ─── 背景テクスチャ ─── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        radial-gradient(circle at 20% 20%, rgba(201,168,76,0.08) 0%, transparent 50%),
+        radial-gradient(circle at 80% 80%, rgba(26,39,68,0.06) 0%, transparent 50%);
+      pointer-events: none;
+    }
+
+    /* ─── ヘッダー ─── */
+    .header {
+      width: 100%;
+      background: var(--navy);
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 2px 12px rgba(26,39,68,0.3);
+    }
+
+    .header-icon {
+      font-size: 22px;
+    }
+
+    .header-title {
+      font-family: 'Noto Serif JP', serif;
+      font-size: 15px;
+      color: var(--cream);
+      letter-spacing: 0.05em;
+    }
+
+    .header-title span {
+      color: var(--gold);
+    }
+
+    /* ─── メインコンテナ ─── */
+    .container {
+      width: 100%;
+      max-width: 420px;
+      padding: 32px 24px 48px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    /* ─── ロケーションカード ─── */
+    .location-card {
+      width: 100%;
+      background: white;
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 4px 24px rgba(26,39,68,0.1);
+      border: 1px solid rgba(201,168,76,0.2);
+      margin-bottom: 32px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .location-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, var(--gold), var(--gold-light));
+    }
+
+    .location-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+
+    .location-name {
+      font-family: 'Noto Serif JP', serif;
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--navy);
+      line-height: 1.4;
+    }
+
+    .location-floor {
+      display: inline-block;
+      margin-top: 10px;
+      background: var(--navy);
+      color: var(--gold);
+      font-size: 11px;
+      font-weight: 500;
+      padding: 3px 10px;
+      border-radius: 20px;
+      letter-spacing: 0.08em;
+    }
+
+    /* ─── スクリーン ─── */
+    .screen {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 24px;
+      animation: fadeUp 0.4s ease both;
+    }
+
+    .screen.hidden { display: none; }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ─── 呼び出しボタン ─── */
+    .call-btn {
+      width: 100%;
+      padding: 22px;
+      background: var(--navy);
+      color: white;
+      border: none;
+      border-radius: 14px;
+      font-family: 'Noto Serif JP', serif;
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      cursor: pointer;
+      transition: all 0.2s;
+      box-shadow: 0 6px 20px rgba(26,39,68,0.3);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .call-btn::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,0.1), transparent);
+    }
+
+    .call-btn:active {
+      transform: scale(0.97);
+      box-shadow: 0 2px 8px rgba(26,39,68,0.3);
+    }
+
+    .call-btn-icon {
+      display: block;
+      font-size: 32px;
+      margin-bottom: 10px;
+    }
+
+    .call-desc {
+      text-align: center;
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.8;
+    }
+
+    /* ─── 待機中ステータス ─── */
+    .status-card {
+      width: 100%;
+      background: white;
+      border-radius: 16px;
+      padding: 32px 24px;
+      box-shadow: 0 4px 24px rgba(26,39,68,0.1);
+      text-align: center;
+    }
+
+    .status-icon {
+      font-size: 52px;
+      margin-bottom: 16px;
+      display: block;
+    }
+
+    .status-title {
+      font-family: 'Noto Serif JP', serif;
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--navy);
+      margin-bottom: 10px;
+    }
+
+    .status-desc {
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.9;
+    }
+
+    /* ウェーブアニメーション */
+    .pulse-ring {
+      width: 80px;
+      height: 80px;
+      margin: 0 auto 20px;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .pulse-ring::before,
+    .pulse-ring::after {
+      content: '';
+      position: absolute;
+      border: 2px solid var(--gold);
+      border-radius: 50%;
+      animation: pulse 2s ease-out infinite;
+    }
+
+    .pulse-ring::after {
+      animation-delay: 0.8s;
+    }
+
+    @keyframes pulse {
+      0% { width: 40px; height: 40px; opacity: 1; }
+      100% { width: 80px; height: 80px; opacity: 0; }
+    }
+
+    .pulse-core {
+      width: 44px;
+      height: 44px;
+      background: var(--gold);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      z-index: 1;
+    }
+
+    /* 対応中 */
+    .responding-card {
+      background: var(--green-light);
+      border: 2px solid var(--green);
+    }
+
+    .responding-card .status-title {
+      color: var(--green);
+    }
+
+    .staff-badge {
+      display: inline-block;
+      margin-top: 16px;
+      background: var(--green);
+      color: white;
+      padding: 6px 18px;
+      border-radius: 20px;
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    /* キャンセルボタン */
+    .cancel-btn {
+      background: none;
+      border: 1px solid rgba(0,0,0,0.15);
+      border-radius: 10px;
+      padding: 12px 28px;
+      font-family: 'Noto Sans JP', sans-serif;
+      font-size: 14px;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .cancel-btn:active { opacity: 0.6; }
+
+    /* タイマー */
+    .timer {
+      font-size: 12px;
+      color: var(--text-muted);
+      letter-spacing: 0.05em;
+    }
+
+    /* エラー */
+    .error-msg {
+      background: #fff0ef;
+      border: 1px solid #ffc5c0;
+      border-radius: 10px;
+      padding: 14px 18px;
+      font-size: 13px;
+      color: var(--red);
+      text-align: center;
+      width: 100%;
+    }
+
+    /* ─── フッター ─── */
+    .footer {
+      width: 100%;
+      text-align: center;
+      padding: 20px;
+      font-size: 11px;
+      color: var(--text-muted);
+      border-top: 1px solid rgba(0,0,0,0.06);
+    }
+  </style>
+</head>
+<body>
+
+  <header class="header">
+    <span class="header-icon">📚</span>
+    <span class="header-title">図書館 <span>スタッフ呼び出し</span></span>
+  </header>
+
+  <main class="container">
+
+    <!-- ロケーション情報 -->
+    <div class="location-card">
+      <div class="location-label">現在地</div>
+      <div class="location-name" id="locationName">読み込み中...</div>
+      <div class="location-floor" id="locationFloor">--</div>
+    </div>
+
+    <!-- 画面①: 呼び出しボタン -->
+    <div class="screen" id="screenReady">
+      <button class="call-btn" onclick="callStaff()">
+        <span class="call-btn-icon">🔔</span>
+        スタッフを呼ぶ
+      </button>
+      <p class="call-desc">
+        本の場所がわからない、手伝いが必要など<br>
+        スタッフがすぐに伺います
+      </p>
+    </div>
+
+    <!-- 画面②: 待機中 -->
+    <div class="screen hidden" id="screenWaiting">
+      <div class="status-card">
+        <div class="pulse-ring">
+          <div class="pulse-core">🔔</div>
+        </div>
+        <div class="status-title">呼び出し中...</div>
+        <p class="status-desc">
+          スタッフに連絡しています<br>
+          しばらくそのままでお待ちください
+        </p>
+        <p class="timer" id="waitTimer" style="margin-top:12px;">0:00</p>
+      </div>
+      <button class="cancel-btn" onclick="cancelCall()">キャンセル</button>
+    </div>
+
+    <!-- 画面③: 対応中（今向かっています） -->
+    <div class="screen hidden" id="screenResponding">
+      <div class="status-card responding-card">
+        <span class="status-icon">🏃</span>
+        <div class="status-title">スタッフが向かっています！</div>
+        <p class="status-desc">
+          まもなく伺います<br>
+          そのままの場所でお待ちください
+        </p>
+        <div class="staff-badge" id="staffName">スタッフ対応中</div>
+      </div>
+    </div>
+
+    <!-- 画面④: 対応完了 -->
+    <div class="screen hidden" id="screenCompleted">
+      <div class="status-card">
+        <span class="status-icon">✅</span>
+        <div class="status-title">対応が完了しました</div>
+        <p class="status-desc">
+          またいつでもお呼びください
+        </p>
+      </div>
+      <button class="call-btn" onclick="resetScreen()" style="font-size:15px;">
+        <span class="call-btn-icon">↩️</span>
+        最初に戻る
+      </button>
+    </div>
+
+    <!-- エラー -->
+    <div class="error-msg hidden" id="errorMsg"></div>
+
+  </main>
+
+  <footer class="footer">© 図書館スタッフ呼び出しシステム</footer>
+
+  <script>
+    // ========================================
+    // ⚠️ Firebase設定（自分のプロジェクトの値に変更）
+    // ========================================
+    const firebaseConfig = {
+      apiKey: "AIzaSyAPg799DO1y3aPWGz_aQb_aUaeP9aKzn2w",
+      authDomain: "lib-staff.firebaseapp.com",
+      databaseURL: "https://lib-staff-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "lib-staff",
+      storageBucket: "lib-staff.firebasestorage.app",
+      messagingSenderId: "860183118414",
+      appId: "1:860183118414:web:2358730cd9c4acdc78b91f"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    // URLパラメータからlocationIdを取得
+    // 例: user.html?location=2F-A-01
+    const urlParams = new URLSearchParams(window.location.search);
+    const locationId = urlParams.get('location') || 'UNKNOWN';
+
+    let currentCallRef = null;
+    let currentCallId = null;
+    let timerInterval = null;
+    let startTime = null;
+
+    // ロケーション情報を取得・表示
+    async function loadLocation() {
+      try {
+        const snap = await db.ref(`locations/${locationId}`).get();
+        if (snap.exists()) {
+          const loc = snap.val();
+          document.getElementById('locationName').textContent = loc.name || locationId;
+          document.getElementById('locationFloor').textContent = loc.floor || locationId;
+        } else {
+          document.getElementById('locationName').textContent = locationId;
+          document.getElementById('locationFloor').textContent = locationId;
+        }
+      } catch (e) {
+        showError('接続エラー: Firebaseの設定を確認してください');
+      }
+    }
+
+    // スタッフ呼び出し
+    async function callStaff() {
+      try {
+        // 既存の待機中呼び出しがないか確認
+        const existing = await db.ref('calls')
+          .orderByChild('locationId')
+          .equalTo(locationId)
+          .get();
+
+        let hasActive = false;
+        existing.forEach(child => {
+          const s = child.val().status;
+          if (s === 'waiting' || s === 'responding') hasActive = true;
+        });
+
+        if (hasActive) {
+          showError('このコーナーは既に呼び出し中です。しばらくお待ちください。');
+          return;
+        }
+
+        // 新規呼び出し作成
+        const callData = {
+          locationId,
+          status: 'waiting',
+          createdAt: Date.now(),
+          respondedAt: null,
+          completedAt: null,
+          staffId: null,
+          staffName: null
+        };
+
+        currentCallRef = db.ref('calls').push();
+        currentCallId = currentCallRef.key;
+        await currentCallRef.set(callData);
+
+        showScreen('screenWaiting');
+        startTimer();
+        listenToCall();
+
+      } catch (e) {
+        showError('呼び出しに失敗しました。もう一度お試しください。');
+        console.error(e);
+      }
+    }
+
+    // 呼び出しのステータス変化を監視
+    function listenToCall() {
+      if (!currentCallRef) return;
+      currentCallRef.on('value', (snap) => {
+        if (!snap.exists()) return;
+        const call = snap.val();
+
+        if (call.status === 'responding') {
+          stopTimer();
+          document.getElementById('staffName').textContent =
+            call.staffName ? `担当: ${call.staffName}` : 'スタッフ対応中';
+          showScreen('screenResponding');
+
+        } else if (call.status === 'completed') {
+          stopTimer();
+          currentCallRef.off();
+          showScreen('screenCompleted');
+
+        } else if (call.status === 'cancelled') {
+          stopTimer();
+          currentCallRef.off();
+          showScreen('screenReady');
+        }
+      });
+    }
+
+    // キャンセル
+    async function cancelCall() {
+      if (!currentCallRef) return;
+      try {
+        await currentCallRef.update({ status: 'cancelled', completedAt: Date.now() });
+        currentCallRef.off();
+        currentCallRef = null;
+        currentCallId = null;
+        stopTimer();
+        showScreen('screenReady');
+      } catch (e) {
+        showError('キャンセルに失敗しました');
+      }
+    }
+
+    // 初期画面に戻す
+    function resetScreen() {
+      currentCallRef = null;
+      currentCallId = null;
+      showScreen('screenReady');
+    }
+
+    // 画面切り替え
+    function showScreen(id) {
+      const screens = ['screenReady','screenWaiting','screenResponding','screenCompleted'];
+      screens.forEach(s => {
+        const el = document.getElementById(s);
+        if (el) {
+          el.classList.toggle('hidden', s !== id);
+          if (s === id) {
+            el.style.animation = 'none';
+            el.offsetHeight; // reflow
+            el.style.animation = '';
+          }
+        }
+      });
+      document.getElementById('errorMsg').classList.add('hidden');
+    }
+
+    // エラー表示
+    function showError(msg) {
+      const el = document.getElementById('errorMsg');
+      el.textContent = msg;
+      el.classList.remove('hidden');
+      setTimeout(() => el.classList.add('hidden'), 5000);
+    }
+
+    // 待機タイマー
+    function startTimer() {
+      startTime = Date.now();
+      timerInterval = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        const m = Math.floor(elapsed / 60);
+        const s = elapsed % 60;
+        document.getElementById('waitTimer').textContent =
+          `${m}:${String(s).padStart(2,'0')}`;
+      }, 1000);
+    }
+
+    function stopTimer() {
+      if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+    }
+
+    // 初期化
+    loadLocation();
+  </script>
+</body>
+</html>
